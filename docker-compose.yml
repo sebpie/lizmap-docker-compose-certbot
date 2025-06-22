@@ -55,18 +55,31 @@ services:
     image: redis:5-alpine
     volumes:
       - { type: volume, source: redis_data, target: /data }
+
+
   web:
     image: nginx:alpine
-    user: ${LIZMAP_UID}:${LIZMAP_GID}
+    container_name: webserver
+      #user: ${LIZMAP_UID}:${LIZMAP_GID}
     volumes:
-      - { type: bind, source: "${LIZMAP_DIR}/etc/nginx.conf", target: /etc/nginx/nginx.conf }
+        #- { type: bind, source: "${LIZMAP_DIR}/etc/nginx.conf", target: /etc/nginx/nginx.conf }
+        #- ./config:/etc/nginx/conf.d:ro
+      - { type: bind, source: "${LIZMAP_DIR}/etc/nginx/conf.d/", target: /etc/nginx/conf.d/}
       - { type: bind, source: "${LIZMAP_DIR}/var/log/nginx", target: /var/log/nginx }
       - { type: bind, source: "${LIZMAP_DIR}/var/nginx-cache", target: /var/cache/nginx }
       - { type: bind, source: "${LIZMAP_DIR}", target: /srv/lizmap }
+      - certbot_conf:/etc/letsencrypt
+      - certbot_www:/var/www/letsencrypt
+    entrypoint: /bin/sh
     ports:
       - ${LIZMAP_PORT}:8080
+      - 80:80
+      - 443:443
+
     depends_on:
       - lizmap
+
+
   postgis:
     image: 3liz/postgis:${POSTGIS_VERSION}
     volumes:
@@ -89,8 +102,30 @@ services:
         aliases:
           - ${POSTGIS_ALIAS}
 
+  certbot:
+    image: nbraun1/certbot
+    container_name: certbot
+    depends_on:
+      - web
+    environment:
+      EMAIL: sebastien.pierrel@gmail.com
+      DOMAINS: carte.coordination-defense-sante.org,utop70.coordination-defense-sante.org
+      AUTHENTICATOR: webroot
+      WEBROOT_PATH: /var/www/letsencrypt
+      POST_HOOK_CMD: docker kill -s HUP $$(docker ps --filter "name=webserver" | awk '{print $$1}')
+      CRON: "* * * * *"
+    volumes:
+      - certbot_conf:/etc/letsencrypt
+      - certbot_www:/var/www/letsencrypt
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+
+
 volumes:
     postgis_data:
         driver: local
     redis_data:
+        driver: local
+    certbot_conf:
+        driver: local
+    certbot_www:
         driver: local
