@@ -70,7 +70,6 @@ services:
       - { type: bind, source: "${LIZMAP_DIR}", target: /srv/lizmap }
       - certbot_conf:/etc/letsencrypt
       - certbot_www:/var/www/letsencrypt
-    entrypoint: /bin/sh
     ports:
       - ${LIZMAP_PORT}:8080
       - 80:80
